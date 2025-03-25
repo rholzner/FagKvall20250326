@@ -1,101 +1,189 @@
 ﻿// See https://aka.ms/new-console-template for more information
 Console.WriteLine("Hello, World!");
 
-/*
-CUPID Principles:
-1. **Composability**: Components should be modular and reusable, allowing them to be composed together easily.
-2. **Unix Philosophy**: Each component should do one thing well, focusing on a single responsibility.
-3. **Predictability**: Behavior should be consistent and easy to understand, avoiding surprises.
-4. **Idiomatic**: Code should follow the conventions and idioms of the language or framework being used.
-5. **Domain-based**: Code should align with the domain it represents, making it intuitive and meaningful.
-*/
-
 public class UserService
 {
     private readonly UserRepository _userRepository;
     private readonly UserValidator _userValidator;
 
-    // Composability: UserService is composed of UserRepository and UserValidator,
-    // allowing each component to focus on its specific responsibility.
     public UserService(UserRepository userRepository, UserValidator userValidator)
     {
         _userRepository = userRepository;
         _userValidator = userValidator;
     }
 
-    // Unix Philosophy: Each method does one thing well. AddUser validates and adds a user.
     public void AddUser(User user)
     {
-        _userValidator.Validate(user); // Predictability: Validation is clear and consistent.
-        _userRepository.Add(user); // Composability: Delegates persistence to UserRepository.
+        ValidateUser(user); // Rule 9: Tell, don't ask. Validation is encapsulated in the UserValidator.
+        SaveUser(user);     // Rule 9: Tell, don't ask. Saving logic is encapsulated in the UserRepository.
     }
 
-    public User GetUser(string name)
+    public User FindUserByName(UserName name)
     {
-        return _userRepository.Get(name); // Predictability: Retrieval logic is simple and consistent.
+        return _userRepository.Get(name); // Rule 5: One Dot Per Line. Directly calls the repository method.
     }
 
     public void UpdateUser(User user)
     {
-        _userValidator.Validate(user); // Predictability: Ensures user data is valid before updating.
-        _userRepository.Update(user); // Composability: Delegates update logic to UserRepository.
+        ValidateUser(user); // Rule 9: Tell, don't ask.
+        ReplaceUser(user);  // Rule 9: Tell, don't ask.
     }
 
-    public void DeleteUser(string name)
+    public void RemoveUser(UserName name)
     {
-        _userRepository.Delete(name); // Unix Philosophy: Focuses solely on deletion.
+        DeleteUserByName(name); // Rule 9: Tell, don't ask.
+    }
+
+    private void ValidateUser(User user)
+    {
+        _userValidator.Validate(user); // Rule 9: Tell, don't ask.
+    }
+
+    private void SaveUser(User user)
+    {
+        _userRepository.Add(user); // Rule 9: Tell, don't ask.
+    }
+
+    private void ReplaceUser(User user)
+    {
+        _userRepository.Update(user); // Rule 9: Tell, don't ask.
+    }
+
+    private void DeleteUserByName(UserName name)
+    {
+        _userRepository.Delete(name); // Rule 9: Tell, don't ask.
     }
 }
 
 public class UserValidator
 {
-    // Predictability: Validation logic is simple and predictable, ensuring clear error handling.
     public void Validate(User user)
     {
-        if (user.Age < 18)
+        if (!user.IsAdult())
         {
             throw new ArgumentException("User must be at least 18 years old.");
         }
     }
+    // Rule 7: Keep All Entities Small. This class has a single responsibility and is concise.
 }
 
 public class UserRepository
 {
-    private readonly List<User> _users = new();
+    private readonly UserCollection _users = new();
 
-    // Composability: UserRepository is a reusable component for managing user data.
     public void Add(User user)
     {
-        _users.Add(user);
+        _users.Add(user); // Rule 4: First Class Collections. UserCollection encapsulates collection behavior.
     }
 
-    public User Get(string name)
+    public User Get(UserName name)
     {
-        return _users.FirstOrDefault(u => u.Name == name); // Predictability: Retrieval is straightforward.
+        return _users.FindByName(name); // Rule 5: One Dot Per Line. Delegates to UserCollection.
     }
 
     public void Update(User user)
     {
-        var existingUser = Get(user.Name);
-        if (existingUser != null)
-        {
-            existingUser.Age = user.Age;
-        }
+        _users.Replace(user); // Rule 5: One Dot Per Line. Delegates to UserCollection.
     }
 
-    public void Delete(string name)
+    public void Delete(UserName name)
     {
-        var user = Get(name);
-        if (user != null)
-        {
-            _users.Remove(user);
-        }
+        _users.RemoveByName(name); // Rule 5: One Dot Per Line. Delegates to UserCollection.
     }
 }
 
 public class User
 {
-    // Predictability: User class is simple and predictable, holding only user data.
-    public string Name { get; set; }
-    public int Age { get; set; }
+    private readonly UserName _name;
+    private readonly Age _age;
+
+    public User(UserName name, Age age)
+    {
+        _name = name;
+        _age = age;
+    }
+
+    public bool IsAdult()
+    {
+        return _age.IsAdult(); // Rule 5: One Dot Per Line. Delegates to Age.
+    }
+
+    public UserName Name => _name; // Rule 3: Wrap All Primitives And Strings. UserName is a value object.
+    public Age Age => _age;       // Rule 3: Wrap All Primitives And Strings. Age is a value object.
+}
+
+public class UserName
+{
+    private readonly string _value;
+
+    public UserName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Name cannot be empty.");
+        }
+        _value = value;
+    }
+
+    public override string ToString()
+    {
+        return _value;
+    }
+    // Rule 3: Wrap All Primitives And Strings. Encapsulates string behavior.
+}
+
+public class Age
+{
+    private readonly int _value;
+
+    public Age(int value)
+    {
+        if (value < 0)
+        {
+            throw new ArgumentException("Age cannot be negative.");
+        }
+        _value = value;
+    }
+
+    public bool IsAdult()
+    {
+        return _value >= 18; // Rule 9: Tell, don't ask. Encapsulates the logic for determining adulthood.
+    }
+
+    public override string ToString()
+    {
+        return _value.ToString();
+    }
+    // Rule 3: Wrap All Primitives And Strings. Encapsulates integer behavior.
+}
+
+public class UserCollection
+{
+    private readonly List<User> _users = new();
+
+    public void Add(User user)
+    {
+        _users.Add(user); // Rule 4: First Class Collections. Encapsulates collection behavior.
+    }
+
+    public User FindByName(UserName name)
+    {
+        return _users.FirstOrDefault(u => u.Name.ToString() == name.ToString()); // Rule 5: One Dot Per Line.
+    }
+
+    public void Replace(User user)
+    {
+        RemoveByName(user.Name); // Rule 9: Tell, don't ask.
+        Add(user);               // Rule 9: Tell, don't ask.
+    }
+
+    public void RemoveByName(UserName name)
+    {
+        var user = FindByName(name); // Rule 5: One Dot Per Line.
+        if (user != null)
+        {
+            _users.Remove(user);
+        }
+    }
+    // Rule 4: First Class Collections. Encapsulates all collection-related logic.
 }
